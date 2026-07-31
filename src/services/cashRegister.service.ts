@@ -14,9 +14,9 @@ export class CashRegisterService {
   }
 
   async openRegister(userId: string, data: OpenCashRegisterDto): Promise<ICashRegisterDocument> {
-    const active = await this.cashRegisterRepository.findActiveRegister(userId);
+    const active = await this.cashRegisterRepository.findActiveRegister();
     if (active) {
-      throw new BadRequestError('Ya existe una caja abierta para este usuario. Debe cerrarla primero.');
+      throw new BadRequestError('Ya existe una caja abierta en esta veterinaria. Debe cerrarla primero.');
     }
 
     return this.cashRegisterRepository.create({
@@ -31,10 +31,10 @@ export class CashRegisterService {
     });
   }
 
-  async getActiveRegister(userId: string): Promise<ICashRegisterDocument> {
-    const active = await this.cashRegisterRepository.findActiveRegister(userId);
+  async getActiveRegister(userId?: string): Promise<ICashRegisterDocument> {
+    const active = await this.cashRegisterRepository.findActiveRegister();
     if (!active) {
-      throw new BadRequestError('No se encontró una caja abierta para este usuario.');
+      throw new BadRequestError('No se encontró una caja abierta en la veterinaria.');
     }
     return active;
   }

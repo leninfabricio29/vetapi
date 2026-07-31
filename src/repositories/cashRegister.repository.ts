@@ -7,8 +7,8 @@ export class CashRegisterRepository extends BaseRepository<ICashRegisterDocument
     super(CashRegisterModel);
   }
 
-  async findActiveRegister(userId: string): Promise<ICashRegisterDocument | null> {
-    return this.model.findOne(this.getQueryFilter({ usuario: userId, estado: 'Abierta' })).exec();
+  async findActiveRegister(userId?: string): Promise<ICashRegisterDocument | null> {
+    return this.model.findOne(this.getQueryFilter({ estado: 'Abierta' })).populate('usuario', 'nombres apellidos usuario rol').exec();
   }
 
   async findWithDetails(filter: any = {}): Promise<ICashRegisterDocument[]> {
