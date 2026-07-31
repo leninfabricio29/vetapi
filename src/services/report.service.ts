@@ -23,8 +23,14 @@ export class ReportService {
   }
 
   async getSalesByDateRange(startDate: Date, endDate: Date, userId?: string): Promise<ISaleDocument[]> {
+    // Adjust endDate to end of day (23:59:59.999 UTC) so sales made during
+    // that day are included. Without this, "2026-07-31" becomes midnight UTC
+    // and any sale recorded later that day would be excluded.
+    const endOfDay = new Date(endDate);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
     const filter: any = {
-      fecha: { $gte: startDate, $lte: endDate }
+      fecha: { $gte: startDate, $lte: endOfDay }
     };
     if (userId) {
       filter.usuario = userId;
@@ -86,7 +92,11 @@ export class ReportService {
     if (startDate || endDate) {
       filter.createdAt = {};
       if (startDate) filter.createdAt.$gte = startDate;
-      if (endDate) filter.createdAt.$lte = endDate;
+      if (endDate) {
+        const endOfDay = new Date(endDate);
+        endOfDay.setUTCHours(23, 59, 59, 999);
+        filter.createdAt.$lte = endOfDay;
+      }
     }
     const movements = await this.cashMovementRepository.find(filter);
     let totalIngresos = 0;
@@ -108,7 +118,11 @@ export class ReportService {
     if (startDate || endDate) {
       filter.fecha = {};
       if (startDate) filter.fecha.$gte = startDate;
-      if (endDate) filter.fecha.$lte = endDate;
+      if (endDate) {
+        const endOfDay = new Date(endDate);
+        endOfDay.setUTCHours(23, 59, 59, 999);
+        filter.fecha.$lte = endOfDay;
+      }
     }
     return this.inventoryMovementRepository.findWithDetails(filter);
   }
