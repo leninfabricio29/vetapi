@@ -224,12 +224,14 @@ export class SaleService {
       });
     }
 
-    // Record cash register income movement
-    await this.cashRegisterService.recordSaleMovement(
-      userId,
-      total,
-      `Venta #${sale._id} (${data.métodoPago})`
-    );
+    // Record cash register income movement ONLY if paid in Efectivo
+    if (data.métodoPago === 'Efectivo') {
+      await this.cashRegisterService.recordSaleMovement(
+        userId,
+        total,
+        `Venta #${sale._id} (Efectivo)`
+      );
+    }
 
     return (await this.saleRepository.findByIdWithDetails((sale._id as any).toString()))!;
   }
@@ -285,12 +287,14 @@ export class SaleService {
       }
     }
 
-    // Record negative movement in Cash Register (Egreso to balance)
-    await this.cashRegisterService.recordSaleAnnulmentMovement(
-      userId,
-      sale.total,
-      `Anulación de Venta #${sale._id}`
-    );
+    // Record negative movement in Cash Register ONLY if original sale was paid in Efectivo
+    if (sale.métodoPago === 'Efectivo') {
+      await this.cashRegisterService.recordSaleAnnulmentMovement(
+        userId,
+        sale.total,
+        `Anulación de Venta #${sale._id} (Efectivo)`
+      );
+    }
 
     return (await this.saleRepository.findByIdWithDetails(id))!;
   }
