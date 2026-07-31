@@ -11,7 +11,7 @@ export class SaleRepository extends BaseRepository<ISaleDocument> {
     return this.model
       .find(this.getQueryFilter(filter))
       .populate('cliente')
-      .populate('usuario', 'nombres apellidos usuario rol')
+      .populate('usuario', 'nombres apellidos usuario rol tipoComisión')
       .populate('detalles.producto')
       .populate('detalles.servicio')
       .sort({ fecha: -1 })
@@ -22,7 +22,7 @@ export class SaleRepository extends BaseRepository<ISaleDocument> {
     return this.model
       .findOne(this.getQueryFilter({ _id: id }))
       .populate('cliente')
-      .populate('usuario', 'nombres apellidos usuario rol')
+      .populate('usuario', 'nombres apellidos usuario rol tipoComisión')
       .populate('detalles.producto')
       .populate('detalles.servicio')
       .exec();
