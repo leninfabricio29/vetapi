@@ -126,4 +126,81 @@ export class ReportService {
     }
     return this.inventoryMovementRepository.findWithDetails(filter);
   }
+
+  /**
+   * Returns daily operational costs (costo de productos vendidos).
+   * Cost = precioCompra × cantidad for each Producto line in completed sales.
+   * Grouped by calendar day so the frontend can aggregate by week and month.
+   */
+  async getOperationalCosts(startDate: Date, endDate: Date): Promise<any[]> {
+    const context = tenantStore.getStore();
+
+    const endOfDay = new Date(endDate);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    const matchStage: any = {
+      fecha: { $gte: startDate, $lte: endOfDay },
+      estado: 'Completada',
+    };
+    if (context?.veterinariaId) {
+      matchStage.veterinaria = new mongoose.Types.ObjectId(context.veterinariaId);
+    }
+
+    return SaleModel.aggregate([
+      { $match: matchStage },
+      { $unwind: '$detalles' },
+      { $match: { 'detalles.tipo': 'Producto' } },
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'detalles.producto',
+          foreignField: '_id',
+          as: 'productoInfo',
+        },
+      },
+      { $unwind: { path: '$productoInfo', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          fecha: 1,
+          nombreProducto: '$productoInfo.nombre',
+          proveedor: '$productoInfo.proveedor',
+          precioCompra: { $ifNull: ['$productoInfo.precioCompra', 0] },
+          precioVenta: '$detalles.precio',
+          cantidad: '$detalles.cantidad',
+          costoLinea: {
+            $multiply: [
+              { $ifNull: ['$productoInfo.precioCompra', 0] },
+              '$detalles.cantidad',
+            ],
+          },
+          ventaLinea: '$detalles.subtotal',
+        },
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$fecha' },
+            month: { $month: '$fecha' },
+            day: { $dayOfMonth: '$fecha' },
+          },
+          fecha: { $first: '$fecha' },
+          costoTotal: { $sum: '$costoLinea' },
+          ventaTotal: { $sum: '$ventaLinea' },
+          unidadesVendidas: { $sum: '$cantidad' },
+          detalle: {
+            $push: {
+              producto: '$nombreProducto',
+              proveedor: '$proveedor',
+              precioCompra: '$precioCompra',
+              precioVenta: '$precioVenta',
+              cantidad: '$cantidad',
+              costoLinea: '$costoLinea',
+              ventaLinea: '$ventaLinea',
+            },
+          },
+        },
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } },
+    ]).exec();
+  }
 }

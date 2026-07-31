@@ -96,4 +96,20 @@ export class ReportController {
       next(error);
     }
   };
+
+  getOperationalCosts = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { startDate, endDate } = req.query;
+      if (!startDate || !endDate) {
+        throw new BadRequestError('Los parámetros startDate y endDate son obligatorios.');
+      }
+      const costs = await this.reportService.getOperationalCosts(
+        new Date(startDate as string),
+        new Date(endDate as string)
+      );
+      return sendSuccess(res, 'Gastos operativos obtenidos exitosamente.', costs);
+    } catch (error) {
+      next(error);
+    }
+  };
 }

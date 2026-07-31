@@ -18,5 +18,6 @@ router.get('/low-stock', controller.getLowStockProducts);
 router.get('/top-products', controller.getTopSellingProducts);
 router.get('/cash-flow', controller.getCashFlowSummary);
 router.get('/inventory-movements', controller.getInventoryMovements);
+router.get('/operational-costs', controller.getOperationalCosts);
 
 export default router;
