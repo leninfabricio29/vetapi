@@ -26,12 +26,15 @@ export class ReportService {
     let start: Date;
     let end: Date;
 
+    const offsetHours = parseInt(process.env.TIMEZONE_OFFSET_HOURS || '5', 10);
+
     if (startDateParam) {
       if (typeof startDateParam === 'string') {
         const datePart = startDateParam.split('T')[0];
         const [y, m, d] = datePart.split('-').map(Number);
         if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
-          start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+          // 00:00:00 local time (UTC-5) -> Date.UTC(y, m - 1, d, offsetHours, 0, 0, 0)
+          start = new Date(Date.UTC(y, m - 1, d, offsetHours, 0, 0, 0));
         } else {
           start = new Date(startDateParam);
         }
@@ -47,9 +50,8 @@ export class ReportService {
         const datePart = endDateParam.split('T')[0];
         const [y, m, d] = datePart.split('-').map(Number);
         if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
-          // Add 1 day + 6 hours buffer (06:00:00 UTC of d+1) to ensure all sales
-          // created during night/evening of day d in UTC-5 (America/Guayaquil) are matched.
-          end = new Date(Date.UTC(y, m - 1, d + 1, 6, 0, 0, 0));
+          // 23:59:59.999 local time (UTC-5) -> Date.UTC(y, m - 1, d + 1, offsetHours - 1, 59, 59, 999)
+          end = new Date(Date.UTC(y, m - 1, d + 1, offsetHours - 1, 59, 59, 999));
         } else {
           end = new Date(endDateParam);
           end.setUTCHours(23, 59, 59, 999);
@@ -128,33 +130,40 @@ export class ReportService {
   }
 
   async getCashFlowSummary(startDateParam?: string | Date, endDateParam?: string | Date): Promise<any> {
-    const filter: any = {};
-    if (startDateParam || endDateParam) {
-      const { startDate, endDate } = this.parseDateRange(startDateParam, endDateParam);
-      filter.createdAt = { $gte: startDate, $lte: endDate };
-    }
+    const { startDate, endDate } = this.parseDateRange(startDateParam, endDateParam);
+
+    // Sum completed sales in range for Ingresos Totales (Ventas + Caja)
+    const sales = await this.saleRepository.findWithDetails({
+      fecha: { $gte: startDate, $lte: endDate },
+      estado: 'Completada',
+    });
+    const totalVentas = sales.reduce((sum, s) => sum + (s.total || 0), 0);
+
+    // Sum manual cash movements in range
+    const filter: any = { createdAt: { $gte: startDate, $lte: endDate } };
     const movements = await this.cashMovementRepository.find(filter);
-    let totalIngresos = 0;
+    let totalIngresosManuales = 0;
     let totalEgresos = 0;
     for (const m of movements) {
-      if (m.tipo === 'Ingreso') totalIngresos += m.monto;
+      if (m.tipo === 'Ingreso') totalIngresosManuales += m.monto;
       else totalEgresos += m.monto;
     }
+
+    const totalIngresos = totalVentas + totalIngresosManuales;
+
     return {
-      totalIngresos,
-      totalEgresos,
-      balance: totalIngresos - totalEgresos,
-      movimientosCount: movements.length
+      totalIngresos: parseFloat(totalIngresos.toFixed(2)),
+      totalEgresos: parseFloat(totalEgresos.toFixed(2)),
+      balance: parseFloat((totalIngresos - totalEgresos).toFixed(2)),
+      movimientosCount: movements.length + sales.length,
     };
   }
 
   async getInventoryMovements(startDateParam?: string | Date, endDateParam?: string | Date): Promise<IInventoryMovementDocument[]> {
-    const filter: any = {};
-    if (startDateParam || endDateParam) {
-      const { startDate, endDate } = this.parseDateRange(startDateParam, endDateParam);
-      filter.fecha = { $gte: startDate, $lte: endDate };
-    }
-    return this.inventoryMovementRepository.findWithDetails(filter);
+    const { startDate, endDate } = this.parseDateRange(startDateParam, endDateParam);
+    return this.inventoryMovementRepository.findWithDetails({
+      fecha: { $gte: startDate, $lte: endDate },
+    });
   }
 
   /**
