@@ -149,6 +149,21 @@ export class CashRegisterService {
     return movement;
   }
 
+  async rollbackSaleMovement(cashRegisterId: string, saleId: string, amount: number): Promise<void> {
+    const movements = await this.cashMovementRepository.find({ caja: cashRegisterId });
+    const saleMovements = movements.filter((m) => m.concepto.includes(`#${saleId}`));
+    for (const mov of saleMovements) {
+      await this.cashMovementRepository.delete((mov._id as any).toString());
+    }
+
+    const register = await this.cashRegisterRepository.findById(cashRegisterId);
+    if (register) {
+      register.ventas = Math.max(0, register.ventas - amount);
+      register.efectivoEsperado = Math.max(0, register.montoInicial + register.ventas + register.ingresos - register.egresos);
+      await register.save();
+    }
+  }
+
   async getMovementsByRegister(cashRegisterId: string): Promise<ICashMovementDocument[]> {
     return this.cashMovementRepository.findByRegister(cashRegisterId);
   }

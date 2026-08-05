@@ -287,12 +287,13 @@ export class SaleService {
       }
     }
 
-    // Record negative movement in Cash Register ONLY if original sale was paid in Efectivo
-    if (sale.métodoPago === 'Efectivo') {
-      await this.cashRegisterService.recordSaleAnnulmentMovement(
-        userId,
-        sale.total,
-        `Anulación de Venta #${sale._id} (Efectivo)`
+    // Rollback Cash Register income movement and sales total ONLY if original sale was paid in Efectivo
+    if (sale.métodoPago === 'Efectivo' && sale.caja) {
+      const registerId = (sale.caja as any)._id ? (sale.caja as any)._id.toString() : sale.caja.toString();
+      await this.cashRegisterService.rollbackSaleMovement(
+        registerId,
+        (sale._id as any).toString(),
+        sale.total
       );
     }
 
