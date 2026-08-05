@@ -74,8 +74,8 @@ export class SaleService {
           subtotalSinIva += itemSubtotal;
         }
 
-        let comPrincipal = typeof product.comisiónPrincipal === 'number' ? product.comisiónPrincipal : undefined;
-        let comSecundario = typeof product.comisiónSecundario === 'number' ? product.comisiónSecundario : undefined;
+        let comPrincipal = typeof item.comisiónPrincipal === 'number' ? item.comisiónPrincipal : (typeof product.comisiónPrincipal === 'number' ? product.comisiónPrincipal : undefined);
+        let comSecundario = typeof item.comisiónSecundario === 'number' ? item.comisiónSecundario : (typeof product.comisiónSecundario === 'number' ? product.comisiónSecundario : undefined);
 
         if (comPrincipal === undefined || comSecundario === undefined) {
           const category = product.categoría as any;

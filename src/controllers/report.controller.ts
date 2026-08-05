@@ -17,8 +17,8 @@ export class ReportController {
         throw new BadRequestError('Los parámetros startDate y endDate son obligatorios.');
       }
       const sales = await this.reportService.getSalesByDateRange(
-        new Date(startDate as string),
-        new Date(endDate as string),
+        startDate as string,
+        endDate as string,
         userId ? (userId as string) : undefined
       );
       return sendSuccess(res, 'Ventas por rango de fecha obtenidas exitosamente.', sales);
@@ -76,9 +76,10 @@ export class ReportController {
   getCashFlowSummary = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { startDate, endDate } = req.query;
-      const start = startDate ? new Date(startDate as string) : undefined;
-      const end = endDate ? new Date(endDate as string) : undefined;
-      const summary = await this.reportService.getCashFlowSummary(start, end);
+      const summary = await this.reportService.getCashFlowSummary(
+        startDate ? (startDate as string) : undefined,
+        endDate ? (endDate as string) : undefined
+      );
       return sendSuccess(res, 'Resumen de flujo de caja obtenido exitosamente.', summary);
     } catch (error) {
       next(error);
@@ -88,9 +89,10 @@ export class ReportController {
   getInventoryMovements = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { startDate, endDate } = req.query;
-      const start = startDate ? new Date(startDate as string) : undefined;
-      const end = endDate ? new Date(endDate as string) : undefined;
-      const movements = await this.reportService.getInventoryMovements(start, end);
+      const movements = await this.reportService.getInventoryMovements(
+        startDate ? (startDate as string) : undefined,
+        endDate ? (endDate as string) : undefined
+      );
       return sendSuccess(res, 'Reporte de movimientos de inventario obtenido exitosamente.', movements);
     } catch (error) {
       next(error);
@@ -104,8 +106,8 @@ export class ReportController {
         throw new BadRequestError('Los parámetros startDate y endDate son obligatorios.');
       }
       const costs = await this.reportService.getOperationalCosts(
-        new Date(startDate as string),
-        new Date(endDate as string)
+        startDate as string,
+        endDate as string
       );
       return sendSuccess(res, 'Gastos operativos obtenidos exitosamente.', costs);
     } catch (error) {

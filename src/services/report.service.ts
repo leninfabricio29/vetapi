@@ -22,15 +22,55 @@ export class ReportService {
     this.cashMovementRepository = new CashMovementRepository();
   }
 
-  async getSalesByDateRange(startDate: Date, endDate: Date, userId?: string): Promise<ISaleDocument[]> {
-    // Adjust endDate to end of day (23:59:59.999 UTC) so sales made during
-    // that day are included. Without this, "2026-07-31" becomes midnight UTC
-    // and any sale recorded later that day would be excluded.
-    const endOfDay = new Date(endDate);
-    endOfDay.setUTCHours(23, 59, 59, 999);
+  private parseDateRange(startDateParam?: string | Date, endDateParam?: string | Date): { startDate: Date; endDate: Date } {
+    let start: Date;
+    let end: Date;
+
+    if (startDateParam) {
+      if (typeof startDateParam === 'string') {
+        const datePart = startDateParam.split('T')[0];
+        const [y, m, d] = datePart.split('-').map(Number);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+        } else {
+          start = new Date(startDateParam);
+        }
+      } else {
+        start = new Date(startDateParam);
+      }
+    } else {
+      start = new Date(0);
+    }
+
+    if (endDateParam) {
+      if (typeof endDateParam === 'string') {
+        const datePart = endDateParam.split('T')[0];
+        const [y, m, d] = datePart.split('-').map(Number);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          // Add 1 day + 6 hours buffer (06:00:00 UTC of d+1) to ensure all sales
+          // created during night/evening of day d in UTC-5 (America/Guayaquil) are matched.
+          end = new Date(Date.UTC(y, m - 1, d + 1, 6, 0, 0, 0));
+        } else {
+          end = new Date(endDateParam);
+          end.setUTCHours(23, 59, 59, 999);
+        }
+      } else {
+        end = new Date(endDateParam);
+        end.setUTCHours(23, 59, 59, 999);
+      }
+    } else {
+      end = new Date();
+      end.setUTCHours(23, 59, 59, 999);
+    }
+
+    return { startDate: start, endDate: end };
+  }
+
+  async getSalesByDateRange(startDateParam: string | Date, endDateParam: string | Date, userId?: string): Promise<ISaleDocument[]> {
+    const { startDate, endDate } = this.parseDateRange(startDateParam, endDateParam);
 
     const filter: any = {
-      fecha: { $gte: startDate, $lte: endOfDay }
+      fecha: { $gte: startDate, $lte: endDate }
     };
     if (userId) {
       filter.usuario = userId;
@@ -87,16 +127,11 @@ export class ReportService {
     ]).exec();
   }
 
-  async getCashFlowSummary(startDate?: Date, endDate?: Date): Promise<any> {
+  async getCashFlowSummary(startDateParam?: string | Date, endDateParam?: string | Date): Promise<any> {
     const filter: any = {};
-    if (startDate || endDate) {
-      filter.createdAt = {};
-      if (startDate) filter.createdAt.$gte = startDate;
-      if (endDate) {
-        const endOfDay = new Date(endDate);
-        endOfDay.setUTCHours(23, 59, 59, 999);
-        filter.createdAt.$lte = endOfDay;
-      }
+    if (startDateParam || endDateParam) {
+      const { startDate, endDate } = this.parseDateRange(startDateParam, endDateParam);
+      filter.createdAt = { $gte: startDate, $lte: endDate };
     }
     const movements = await this.cashMovementRepository.find(filter);
     let totalIngresos = 0;
@@ -113,16 +148,11 @@ export class ReportService {
     };
   }
 
-  async getInventoryMovements(startDate?: Date, endDate?: Date): Promise<IInventoryMovementDocument[]> {
+  async getInventoryMovements(startDateParam?: string | Date, endDateParam?: string | Date): Promise<IInventoryMovementDocument[]> {
     const filter: any = {};
-    if (startDate || endDate) {
-      filter.fecha = {};
-      if (startDate) filter.fecha.$gte = startDate;
-      if (endDate) {
-        const endOfDay = new Date(endDate);
-        endOfDay.setUTCHours(23, 59, 59, 999);
-        filter.fecha.$lte = endOfDay;
-      }
+    if (startDateParam || endDateParam) {
+      const { startDate, endDate } = this.parseDateRange(startDateParam, endDateParam);
+      filter.fecha = { $gte: startDate, $lte: endDate };
     }
     return this.inventoryMovementRepository.findWithDetails(filter);
   }
@@ -132,14 +162,13 @@ export class ReportService {
    * Cost = precioCompra × cantidad for each Producto line in completed sales.
    * Grouped by calendar day so the frontend can aggregate by week and month.
    */
-  async getOperationalCosts(startDate: Date, endDate: Date): Promise<any[]> {
+  async getOperationalCosts(startDateParam: string | Date, endDateParam: string | Date): Promise<any[]> {
     const context = tenantStore.getStore();
-
-    const endOfDay = new Date(endDate);
-    endOfDay.setUTCHours(23, 59, 59, 999);
+    const { startDate, endDate } = this.parseDateRange(startDateParam, endDateParam);
+    const timezone = process.env.TIMEZONE || 'America/Guayaquil';
 
     const matchStage: any = {
-      fecha: { $gte: startDate, $lte: endOfDay },
+      fecha: { $gte: startDate, $lte: endDate },
       estado: 'Completada',
     };
     if (context?.veterinariaId) {
@@ -179,11 +208,19 @@ export class ReportService {
       {
         $group: {
           _id: {
-            year: { $year: '$fecha' },
-            month: { $month: '$fecha' },
-            day: { $dayOfMonth: '$fecha' },
+            year: { $year: { date: '$fecha', timezone } },
+            month: { $month: { date: '$fecha', timezone } },
+            day: { $dayOfMonth: { date: '$fecha', timezone } },
           },
-          fecha: { $first: '$fecha' },
+          fecha: {
+            $first: {
+              $dateToString: {
+                format: '%Y-%m-%d',
+                date: '$fecha',
+                timezone
+              }
+            }
+          },
           costoTotal: { $sum: '$costoLinea' },
           ventaTotal: { $sum: '$ventaLinea' },
           unidadesVendidas: { $sum: '$cantidad' },

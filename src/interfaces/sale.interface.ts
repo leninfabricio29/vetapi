@@ -46,6 +46,8 @@ export interface CreateSaleItemDto {
   producto?: string;
   servicio?: string;
   cantidad: number;
+  comisiónPrincipal?: number;
+  comisiónSecundario?: number;
 }
 
 export interface CreateSaleDto {

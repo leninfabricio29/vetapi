@@ -205,5 +205,7 @@ export const saleValidators = {
     body('detalles.*.tipo').isIn(['Producto']).withMessage('El tipo del detalle debe ser Producto.'),
     body('detalles.*.cantidad').isInt({ min: 1 }).withMessage('La cantidad de cada detalle debe ser un número entero mayor o igual a 1.'),
     body('detalles.*.producto').isMongoId().withMessage('El ID de producto debe ser un ID válido.'),
+    body('detalles.*.comisiónPrincipal').optional().isFloat({ min: 0, max: 100 }).withMessage('La comisión principal debe estar entre 0 y 100.'),
+    body('detalles.*.comisiónSecundario').optional().isFloat({ min: 0, max: 100 }).withMessage('La comisión secundaria debe estar entre 0 y 100.'),
   ],
 };
